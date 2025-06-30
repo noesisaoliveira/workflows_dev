@@ -1,0 +1,154 @@
+name: "Job & Reusable: Create Harvest Package"
+
+# criados repository secrets (a criar no repo chamador da action)
+# HARVEST_USERNAME
+# HARVEST_PASSWORD
+
+on:
+#  workflow_dispatch:
+#    inputs:
+#      harvest-project-name:
+#        description: "Name of the CM3 Harvest project"
+#        required: true
+#        type: string
+#      environment:
+#        description: "Deploy target environment"
+#        required: true
+#        type: string
+#      commitID:
+#        description: "Commit ID of the PR to deploy"
+#        required: true
+#        type: string
+#        default: ''
+#      changeID:
+#        description: "Delivered Change ID List"
+#        required: true
+#        type: string
+#        default: ''
+#      packageType:
+#        description: "Type of the package to create"
+#        required: true
+#        type: string
+#        default: ''
+    
+  workflow_call:
+    inputs:
+      environment:
+        description: "Deploy target environment"
+        required: true
+        type: string
+      commitID:
+        description: "Commit ID of the PR to deploy"
+        required: true
+        type: string
+        default: ''
+      changeID:
+        description: "Delivered Change ID List"
+        required: true
+        type: string
+        default: ''
+
+jobs:
+  Create-Harvest-Package:
+    runs-on: github-gcp-arc-rs-general
+    #criar secção de variaveis de ambiente com o broker HARVEST_BROKER
+    env:
+      HARVEST_BROKER: "svlhvcpfe01.corporativo.pt"
+      #HARVEST_BROKER: "svlhvcqfe02.corporativo.pt"
+    steps:
+    - name: Definir project_name e packageType
+      id: define-project-name
+  run: |
+    echo "project_name=CM3-APIGEE_X-R1" >> $GITHUB_OUTPUT
+    echo "packageType=A" >> $GITHUB_OUTPUT
+
+      #Step para fazer lógica nos ignores ambiente com base na variável "environment"
+      - name: Set ignores do pacote
+        id: set-ignores
+        run: |
+          # Remove spaces and force to upper case
+          environment="${{ inputs.environment }}"
+          environmentClean=$(echo "${environment}" | sed 's/ //g')
+          environmentUpper=${environmentClean^^}
+
+          if [[ "${environmentUpper}" == "PRD" ]]
+          then
+            ignore_ist=y
+            ignore_pprd=y
+            ignore_prd=n
+          elif [[ "${environmentUpper}" == "PPRD" ]]
+          then
+            ignore_ist=y
+            ignore_pprd=n
+            ignore_prd=y
+          elif [[ "${environmentUpper}" == "QMS" ]]
+          then
+            ignore_ist=n
+            ignore_pprd=y
+            ignore_prd=y
+          else
+            # catch and raise Invalid environment Error
+            echo "ERROR: Invalid target environment: ${{ inputs.environment }}"
+            echo "Valid values are only: QMS, PPRD, PRD"
+            exit 1
+          fi
+
+          echo "ignore_ist=$ignore_ist"  >> $GITHUB_OUTPUT
+          echo "ignore_pprd=$ignore_pprd"  >> $GITHUB_OUTPUT
+          echo "ignore_prd=$ignore_prd"  >> $GITHUB_OUTPUT
+          echo "environmentUpper= $environmentUpper"  >> $GITHUB_OUTPUT
+
+      - name: Validar repo e definir harvest_project_name
+        id: validate-repo
+        run: |
+          repo="${{ github.repository }}"
+          if [[ "$repo" == nosportugal/apigee-x-* ]]; then
+            echo "harvest_project_name=${{ steps.define-project-name.outputs.project_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "ERROR: Repositório inválido para este Workflow: $repo"
+            exit 1
+          fi
+      # Step para output das variáveis que vai enviar no curl para API Harvest
+
+      - name: debug inputs
+        id: debug-inputs
+        run: |
+          # Remove spaces from received changeID
+          changeIDclean=$(echo "${{ inputs.changeID }}" | sed 's/ //g')
+
+          echo "Harvest Project: ${{ steps.validate-repo.outputs.harvest_project_name }}"
+          echo "broker: ${{ env.HARVEST_BROKER }}"
+          echo "change_id: ${changeIDclean}"
+          echo "ENV to deploy: ${{ steps.set-ignores.outputs.environmentUpper }}"
+          echo "ignore_ist: ${{ steps.set-ignores.outputs.ignore_ist }}"
+          echo "ignore_pprd: ${{ steps.set-ignores.outputs.ignore_pprd }}"
+          echo "ignore_prd: ${{ steps.set-ignores.outputs.ignore_prd }}"
+          echo "git_id_to: ${{ inputs.commitID }}"
+          echo "git_repo_link: ${{ github.event.pull_request.html_url }}"
+          echo "packageType: ${{ steps.define-project-name.outputs.packageType }}"
+          
+          echo "changeID=$changeIDclean"  >> $GITHUB_OUTPUT
+
+
+    # Passar as variáveis corretas no curl
+      - name: create harvest package
+        id: create-harvest-package
+        run: |
+           curl -X 'POST' \
+             'https://cicd-api.corporativo.pt/harvest/api/v1/executions/' \
+             -H 'accept: application/json' \
+             -H 'Content-Type: application/json' \
+             -d '{
+              "project":"${{ steps.validate-repo.outputs.harvest_project_name }}",
+              "broker":"${{ env.HARVEST_BROKER }}",
+              "username":"${{ secrets.HARVEST_USERNAME }}",
+              "password":"${{ secrets.HARVEST_PASSWORD }}",
+              "change_id":"${{ steps.debug-inputs.outputs.changeID }}",
+              "ignore_ist":"${{ steps.set-ignores.outputs.ignore_ist }}",
+              "ignore_pprd":"${{ steps.set-ignores.outputs.ignore_pprd }}",
+              "ignore_prd":"${{ steps.set-ignores.outputs.ignore_prd }}",
+              "git_id_to":"${{ inputs.commitID }}",
+              "git_repo_link":"${{ github.event.pull_request.html_url }}",
+              "package_type":"${{ steps.define-project-name.outputs.packageType }}"
+           }'
+         
