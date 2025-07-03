@@ -1,0 +1,26 @@
+name: Create Summary Workflow
+
+on:
+  push:
+    paths:
+      - 'files/script.sh'
+
+jobs:
+  summary:
+    name: summary
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: permissões para o script
+        run: chmod +x files/script.sh
+
+      - name: Executar script com summary
+        run: |
+          files/script.sh \
+            "${{ github.job }}" \
+            "${{ github.sha }}" \
+            "${{ github.ref_name }}" \
+            "${{ github.event_name }}"
