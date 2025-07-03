@@ -53,6 +53,6 @@ jobs:
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `Issue criado automaticamente pelo Workflow: ${workflowName} - pela execuçáo Nr: #${runNumber}`,
+              title: `Issue criado automaticamente pelo Workflow: ${workflowName} - pela execução Nr: #${runNumber}`,
               body: `Este issue foi criado por **${actor}** na execução do workflow.`
             });
