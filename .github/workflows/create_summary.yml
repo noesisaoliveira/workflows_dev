@@ -34,7 +34,7 @@ jobs:
             "${{ github.event_name }}"
 
   create-issue:
-    if: github.event_name == 'workflow_dispatch' && inputs.createIssue == 'true'
+    if: github.event_name == 'workflow_dispatch' && inputs.createIssue
     name: create-issue
     runs-on: ubuntu-latest
     permissions:
