@@ -4,17 +4,9 @@ on:
   push:
     paths:
       - 'files/script.sh'
-  workflow_dispatch:
-    inputs:
-      createIssue:
-        description: 'Create issue?'
-        required: true
-        default: 'false'
-        type: boolean
 
 jobs:
   summary:
-    if: github.event_name == 'push'
     name: summary
     runs-on: ubuntu-latest
 
@@ -32,26 +24,3 @@ jobs:
             "${{ github.sha }}" \
             "${{ github.ref_name }}" \
             "${{ github.event_name }}"
-
-  create-issue:
-    if: github.event_name == 'workflow_dispatch' && inputs.createIssue == 'true'
-    name: create-issue
-    runs-on: ubuntu-latest
-    permissions:
-      issues: write
-
-    steps:
-      - name: Criar issue
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const runNumber = process.env.GITHUB_RUN_NUMBER;
-            const actor = process.env.GITHUB_ACTOR;
-
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `Issue criado automaticamente pela execuçáo do workflow #${runNumber}`,
-              body: `Este issue foi criada automaticamente por **${actor}** na execução manual do workflow.`
-            });
