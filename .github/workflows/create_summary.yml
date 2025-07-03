@@ -47,11 +47,12 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const runNumber = process.env.GITHUB_RUN_NUMBER;
+            const workflowName = process.env.GITHUB_WORKFLOW;
             const actor = process.env.GITHUB_ACTOR;
 
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `Issue criado automaticamente pela execuçáo do workflow #${runNumber}`,
-              body: `Este issue foi criada automaticamente por **${actor}** na execução manual do workflow.`
+              title: `Issue criado automaticamente pelo Workflow: ${workflowName} - pela execuçáo Nr: #${runNumber}`,
+              body: `Este issue foi criado por **${actor}** na execução do workflow.`
             });
